@@ -1,4 +1,4 @@
-name: Build Trade Hunter APK
+name: Build
 on: [push]
 jobs:
   build:
@@ -11,24 +11,47 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.6'
+          flutter-version: '3.22.2'
           channel: 'stable'
-      - name: Build APK
-        run: |
+      - run: |
           flutter create . --platforms=android --org com.tradehunter.app --project-name trade_hunter
+          cat > pubspec.yaml << 'YAML'
+          name: trade_hunter
+          publish_to: 'none'
+          version: 10.0.0+1
+          environment:
+            sdk: ">=3.0.0 <4.0.0"
+          dependencies:
+            flutter:
+              sdk: flutter
+            image_picker: ^1.0.7
+            google_mlkit_text_recognition: ^0.13.1
+          flutter:
+            uses-material-design: true
+          YAML
           cat > lib/main.dart << 'DART'
-          import 'package:flutter/material.dart';
-          void main()=>runApp(MaterialApp(debugShowCheckedModeBanner:false,home:TradeHunter()));
-          class TradeHunter extends StatefulWidget{ @override State<TradeHunter> createState()=>_TH();}
-          class _TH extends State<TradeHunter>{
-            String result="TRADE HUNTER - READY\n\n50 Features:\nPCR, OI, Volume, RSI, MaxPain, OI Type, Chart Pattern, FII/DII, Greeks, Straddle, Paper Trade, Safety";
-            @override Widget build(BuildContext context){
-              return Scaffold(appBar:AppBar(title:Text('TRADE HUNTER v10'),backgroundColor:Color(0xFF0D1B2A)),body:SingleChildScrollView(padding:EdgeInsets.all(16),child:Column(children:[Icon(Icons.gps_fixed,size:80,color:Colors.green),SizedBox(height:10),Text('TRADE HUNTER',style:TextStyle(fontSize:28,fontWeight:FontWeight.bold)),SizedBox(height:10),Card(color:Colors.green.shade50,child:Padding(padding:EdgeInsets.all(16),child:Text(result,style:TextStyle(fontSize:14)))),SizedBox(height:20),ElevatedButton(onPressed:(){setState(()=>result="HUNTER ACTIVE!\n\nPCR: 1.35 Bullish\nCall OI: 45000\nPut OI: 72000\nRSI: 32 Oversold\nMaxPain: 22100\nPattern: Double Bottom\n\nSUGGESTION: CALL BUY 90%\nPlan: Buy ATM Call SL Low Target +100");},child:Text('START HUNTING'),style:ElevatedButton.styleFrom(backgroundColor:Colors.green,minimumSize:Size(double.infinity,50))),SizedBox(height:10),Text('Offline | No Ads | Educational | Safety First',style:TextStyle(fontSize:10,color:Colors.grey))])));}
+          import 'dart:io'; import 'package:flutter/material.dart'; import 'package:image_picker/image_picker.dart'; import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+          void main()=>runApp(MaterialApp(debugShowCheckedModeBanner:false,home:H()));
+          class H extends StatefulWidget{ @override State<H> createState()=>_H();}
+          class _H extends State<H>{
+            File? im; String txt="Ready - Screenshot lo"; bool b=false;
+            pick(ImageSource s) async {
+              final p=await ImagePicker().pickImage(source:s,imageQuality:80);
+              if(p==null) return;
+              setState((){im=File(p.path); b=true;});
+              final r=await TextRecognizer().processImage(InputImage.fromFilePath(p.path));
+              String t=r.text.toLowerCase();
+              double pcr=double.tryParse(RegExp(r'pcr\D*([0-9.]+)').firstMatch(t)?.group(1)??"1")??1;
+              double rsi=double.tryParse(RegExp(r'rsi\D*([0-9.]+)').firstMatch(t)?.group(1)??"50")??50;
+              String s1=pcr>1.2 && rsi<40 ? "🟢 CALL BUY 90% - SL Low Target +100" : pcr<0.8 && rsi>60 ? "🔴 PUT BUY 90% - SL High" : "🟡 WAIT - Paper Only";
+              setState((){b=false; txt="$s1\n\nPCR $pcr | RSI $rsi\n\n${r.text.substring(0,r.text.length>300?300:r.text.length)}";});
+            }
+            @override Widget build(BuildContext c){return Scaffold(appBar:AppBar(title:Text('TRADE HUNTER PRO'),backgroundColor:Color(0xFF0D1B2A)),body:SingleChildScrollView(padding:EdgeInsets.all(12),child:Column(children:[Row(children:[Expanded(child:ElevatedButton.icon(onPressed:()=>pick(ImageSource.camera),icon:Icon(Icons.camera),label:Text('CAMERA'),style:ElevatedButton.styleFrom(backgroundColor:Colors.orange))),SizedBox(width:8),Expanded(child:ElevatedButton.icon(onPressed:()=>pick(ImageSource.gallery),icon:Icon(Icons.photo),label:Text('GALLERY'),style:ElevatedButton.styleFrom(backgroundColor:Colors.green))) ]), if(im!=null) Image.file(im!,height:200), if(b) LinearProgressIndicator(), Card(child:Padding(padding:EdgeInsets.all(12),child:Text(txt)))])));}
           }
           DART
           flutter pub get
           flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: Trade-Hunter-APK
+          name: Trade-Hunter-Final-APK
           path: build/app/outputs/flutter-apk/app-release.apk
